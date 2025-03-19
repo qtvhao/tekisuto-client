@@ -48,18 +48,29 @@ export class ChatCompletionService {
         body: JSON.stringify(requestBody),
       });
 
-      const data: ChatCompletionResponse = await response.json();
+      const data = await response.json();
 
       if (data.error) {
         return this.pollForCompletion(data.conversation_id, cacheKey);
       }
 
-      if (typeof data.markdown_text === 'undefined') {
+      const markdown_text =
+        this.output === 'chat-completion-message'
+          ? data.messages?.[0]?.markdown_text
+          : data.markdown_text;
+
+      if (typeof markdown_text === 'undefined') {
         throw new Error('Unexpected response format');
       }
 
-      await writeCache(cacheKey, Buffer.from(JSON.stringify(data)));
-      return data;
+      const completionData: ChatCompletionResponse = {
+        markdown_text,
+        conversation_id: data.conversation_id,
+        audio_base64: data.audio_base64,
+      };
+
+      await writeCache(cacheKey, Buffer.from(JSON.stringify(completionData)));
+      return completionData;
     } catch (error) {
       console.error('Error fetching chat completion:', error);
       return null;
@@ -75,11 +86,26 @@ export class ChatCompletionService {
 
       try {
         const response = await fetch(url);
-        const conversationData: ChatCompletionResponse = await response.json();
+        const data = await response.json();
 
-        if (!conversationData.error) {
-          await writeCache(cacheKey, Buffer.from(JSON.stringify(conversationData)));
-          return conversationData;
+        if (!data.error) {
+          const markdown_text =
+            this.output === 'chat-completion-message'
+              ? data.messages?.[0]?.markdown_text
+              : data.markdown_text;
+
+          if (typeof markdown_text === 'undefined') {
+            throw new Error('Unexpected response format during polling');
+          }
+
+          const completionData: ChatCompletionResponse = {
+            markdown_text,
+            conversation_id: data.conversation_id,
+            audio_base64: data.audio_base64,
+          };
+
+          await writeCache(cacheKey, Buffer.from(JSON.stringify(completionData)));
+          return completionData;
         }
       } catch (error) {
         console.error('Polling error:', error);
