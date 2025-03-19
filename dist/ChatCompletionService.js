@@ -34,11 +34,19 @@ export class ChatCompletionService {
             if (data.error) {
                 return this.pollForCompletion(data.conversation_id, cacheKey);
             }
-            if (typeof data.markdown_text === 'undefined') {
+            const markdown_text = this.output === 'chat-completion-message'
+                ? data.messages?.[0]?.markdown_text
+                : data.markdown_text;
+            if (typeof markdown_text === 'undefined') {
                 throw new Error('Unexpected response format');
             }
-            await writeCache(cacheKey, Buffer.from(JSON.stringify(data)));
-            return data;
+            const completionData = {
+                markdown_text,
+                conversation_id: data.conversation_id,
+                audio_base64: data.audio_base64,
+            };
+            await writeCache(cacheKey, Buffer.from(JSON.stringify(completionData)));
+            return completionData;
         }
         catch (error) {
             console.error('Error fetching chat completion:', error);
@@ -52,10 +60,21 @@ export class ChatCompletionService {
             console.log({ url });
             try {
                 const response = await fetch(url);
-                const conversationData = await response.json();
-                if (!conversationData.error) {
-                    await writeCache(cacheKey, Buffer.from(JSON.stringify(conversationData)));
-                    return conversationData;
+                const data = await response.json();
+                if (!data.error) {
+                    const markdown_text = this.output === 'chat-completion-message'
+                        ? data.messages?.[0]?.markdown_text
+                        : data.markdown_text;
+                    if (typeof markdown_text === 'undefined') {
+                        throw new Error('Unexpected response format during polling');
+                    }
+                    const completionData = {
+                        markdown_text,
+                        conversation_id: data.conversation_id,
+                        audio_base64: data.audio_base64,
+                    };
+                    await writeCache(cacheKey, Buffer.from(JSON.stringify(completionData)));
+                    return completionData;
                 }
             }
             catch (error) {
