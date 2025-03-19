@@ -16,8 +16,9 @@ export class ChatCompletionService {
     async fetchCompletion(content = 'Lợi ích của Build in Public') {
         const cacheKey = this.generateCacheKey(content);
         const cachedData = await readCache(cacheKey);
-        if (cachedData)
+        if (cachedData) {
             return JSON.parse(cachedData.toString());
+        }
         try {
             const requestBody = {
                 output: this.output,
@@ -34,7 +35,7 @@ export class ChatCompletionService {
                 return this.pollForCompletion(data.conversation_id, cacheKey);
             }
             if (typeof data.markdown_text === 'undefined') {
-                throw new Error("Unexpected response format");
+                throw new Error('Unexpected response format');
             }
             await writeCache(cacheKey, Buffer.from(JSON.stringify(data)));
             return data;

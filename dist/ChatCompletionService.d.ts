@@ -1,3 +1,9 @@
+interface ChatCompletionResponse {
+    markdown_text: string;
+    conversation_id: string;
+    audio_base64: string;
+    error?: string;
+}
 export declare class ChatCompletionService {
     private model;
     private output;
@@ -5,6 +11,7 @@ export declare class ChatCompletionService {
     private static MAX_RETRIES;
     constructor(model?: string, output?: string);
     private generateCacheKey;
-    fetchCompletion(content?: string): Promise<any>;
+    fetchCompletion(content?: string): Promise<ChatCompletionResponse | null>;
     private pollForCompletion;
 }
+export {};
