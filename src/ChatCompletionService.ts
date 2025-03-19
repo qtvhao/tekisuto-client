@@ -6,7 +6,7 @@ interface ChatMessage {
   content: string;
 }
 
-interface ChatCompletionResponse {
+export interface ChatCompletionResponse {
   markdown_text: string;
   conversation_id: string;
   audio_base64: string;

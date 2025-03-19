@@ -1,4 +1,4 @@
-interface ChatCompletionResponse {
+export interface ChatCompletionResponse {
     markdown_text: string;
     conversation_id: string;
     audio_base64: string;
@@ -14,4 +14,3 @@ export declare class ChatCompletionService {
     fetchCompletion(content?: string): Promise<ChatCompletionResponse | null>;
     private pollForCompletion;
 }
-export {};
