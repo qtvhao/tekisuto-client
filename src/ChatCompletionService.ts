@@ -112,8 +112,8 @@ export class ChatCompletionService {
       }
 
       retries++;
-      console.log(`Polling again in 1 second... Attempt ${retries}/${ChatCompletionService.MAX_RETRIES}`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.debug(`Retry attempt ${retries} of ${ChatCompletionService.MAX_RETRIES}: Still waiting for a successful chat completion response for conversation ID: ${conversationId}. Pausing 10 second before the next polling attempt.`);
+      await new Promise(resolve => setTimeout(resolve, 10_000));
     }
 
     throw new Error('Max polling attempts reached without success');
