@@ -61,12 +61,14 @@ export class ChatCompletionService {
     const cacheKey = this.generateCacheKey(content);
     const cachedData = await readCache(cacheKey);
 
-    const parsedData = JSON.parse(cachedData.toString());
-    if (cachedData && this.isEligibleResponse(parsedData)) {
-      try {
-        return this.transformToChatCompletionResponse(parsedData);
-      } catch (e) {
-        console.warn('Failed to parse cached data:', e);
+    if (cachedData) {
+      const parsedData = JSON.parse(cachedData.toString());
+      if (this.isEligibleResponse(parsedData)) {
+        try {
+          return this.transformToChatCompletionResponse(parsedData);
+        } catch (e) {
+          console.warn('Failed to parse cached data:', e);
+        }
       }
     }
 
