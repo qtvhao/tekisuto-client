@@ -6,6 +6,8 @@ interface ChatMessage {
   content: string;
 }
 
+type ChatCompletionOutputType = 'chat-completion-readaloud' | 'chat-completion-message';
+
 export interface ChatCompletionResponse {
   markdown_text: string;
   conversation_id: string;
@@ -19,20 +21,53 @@ export class ChatCompletionService {
 
   constructor(
     private model: string = 'gpt-4',
-    private output: string = 'chat-completion-readaloud'
-  ) {}
+    private output: ChatCompletionOutputType = 'chat-completion-readaloud'
+  ) { }
 
   private generateCacheKey(content: string): string {
-    const hash = crypto.createHash('md5').update(content).digest('hex');
+    const hash = crypto.createHash('md5').update(content + this.output).digest('hex');
     return `chat_${hash}.json`;
+  }
+
+  private transformToChatCompletionResponse(data: any): ChatCompletionResponse {
+    const markdown_text = data.choices[0].message.content
+
+    if (typeof markdown_text === 'undefined') {
+      throw new Error('Unexpected response format during transformation');
+    }
+
+    return {
+      markdown_text,
+      conversation_id: data.id,
+      audio_base64: data.choices[0].message.audio.data
+    };
+  }
+
+  private isEligibleResponse(data: any): boolean {
+    if (!data || !data.choices || !data.choices[0]?.message) return false;
+
+    if (this.output === 'chat-completion-readaloud' && data.choices[0].message.audio?.data) {
+      return true;
+    }
+
+    if (this.output === 'chat-completion-message' && data.choices[0].message.content) {
+      return true;
+    }
+
+    return false;
   }
 
   public async fetchCompletion(content: string = 'Lợi ích của Build in Public'): Promise<ChatCompletionResponse | null> {
     const cacheKey = this.generateCacheKey(content);
     const cachedData = await readCache(cacheKey);
 
-    if (cachedData) {
-      return JSON.parse(cachedData.toString()) as ChatCompletionResponse;
+    const parsedData = JSON.parse(cachedData.toString());
+    if (cachedData && this.isEligibleResponse(parsedData)) {
+      try {
+        return this.transformToChatCompletionResponse(parsedData);
+      } catch (e) {
+        console.warn('Failed to parse cached data:', e);
+      }
     }
 
     try {
@@ -50,27 +85,7 @@ export class ChatCompletionService {
 
       const data = await response.json();
 
-      if (data.error) {
-        return this.pollForCompletion(data.conversation_id, cacheKey);
-      }
-
-      const markdown_text =
-        this.output === 'chat-completion-message'
-          ? data.messages?.[0]?.markdown_text
-          : data.markdown_text;
-
-      if (typeof markdown_text === 'undefined') {
-        throw new Error('Unexpected response format');
-      }
-
-      const completionData: ChatCompletionResponse = {
-        markdown_text,
-        conversation_id: data.conversation_id,
-        audio_base64: data.audio_base64,
-      };
-
-      await writeCache(cacheKey, Buffer.from(JSON.stringify(completionData)));
-      return completionData;
+      return this.pollForCompletion(data.conversationId, cacheKey);
     } catch (error) {
       console.error('Error fetching chat completion:', error);
       return null;
@@ -89,23 +104,12 @@ export class ChatCompletionService {
         const data = await response.json();
 
         if (!data.error) {
-          const markdown_text =
-            this.output === 'chat-completion-message'
-              ? data.messages?.[0]?.markdown_text
-              : data.markdown_text;
+          await writeCache(cacheKey, Buffer.from(JSON.stringify(data)));
+          if (this.isEligibleResponse(data)) {
+            const completionData = this.transformToChatCompletionResponse(data);
 
-          if (typeof markdown_text === 'undefined') {
-            throw new Error('Unexpected response format during polling');
+            return completionData;
           }
-
-          const completionData: ChatCompletionResponse = {
-            markdown_text,
-            conversation_id: data.conversation_id,
-            audio_base64: data.audio_base64,
-          };
-
-          await writeCache(cacheKey, Buffer.from(JSON.stringify(completionData)));
-          return completionData;
         }
       } catch (error) {
         console.error('Polling error:', error);
